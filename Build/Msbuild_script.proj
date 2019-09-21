@@ -1,12 +1,185 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+<?xml version="1.0" encoding="utf-8"?>
 
-namespace BuildApp.Build
-{
-    class Msbuils_script
-    {
-    }
-}
+<Project ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\MSBuildCommunityTasks\MSBuild.Community.Tasks.Targets"/>
+  <Import Project="$(MSBuildExtensionsPath)\ExtensionPack\4.0\MSBuild.ExtensionPack.tasks"/>
+
+  <UsingTask TaskName="UpdateAssembly.Tasks.IncrementingNumber" AssemblyFile="\\ad\nas\WorkBuildOutput\CommonFolders\DMEA\UpdateAssembly.Tasks.dll" />
+
+  <PropertyGroup>
+    <OutputDir>$(_jenkWorkSpace)\Bin</OutputDir>
+    <_configPathDev>$(_jenkWorkSpace)\WebConfigurator\DevEnv\</_configPathDev>
+    <!--<_configPathTest>$(_jenkWorkSpace)\WebConfigurator\TestEnv\</_configPathTest>
+    <_configPathProd>$(_jenkWorkSpace)\WebConfigurator\ProdEnv\</_configPathProd>-->
+    <BuildPackageDir>$(_jenkWorkSpace)\BuildOutput</BuildPackageDir>
+    <_publishedWebsites>$(_jenkWorkSpace)\bin\_PublishedWebsites</_publishedWebsites>
+    <BeforeCompileDependsOn>
+      _stampAssemblyInfo;
+      _solutionToBuild
+    </BeforeCompileDependsOn>
+  </PropertyGroup>
+
+  <Target Name="Build"  DependsOnTargets="$(BeforeCompileDependsOn)">
+  </Target>
+
+  <Target Name="_stampAssemblyInfo">
+    <Message Text="Modifying AssemblyInfo files of $(_jenkAppBranch) branch..."/>
+    <ReadLinesFromFile File="$(_jenkWorkSpace)\Build\propertyFile.properties">
+      <Output TaskParameter="Lines" ItemName="p_BuildVersion" />
+    </ReadLinesFromFile>
+
+    <ItemGroup>
+      <AssemblyInfoFiles Include="$(_jenkWorkSpace)\**\assemblyinfo.*" />
+    </ItemGroup>
+
+    <Attrib Files="@(AssemblyInfoFiles)" ReadOnly="false"/>
+
+    <FileUpdate Files="@(AssemblyInfoFiles)"
+                Regex="AssemblyVersion\(\&quot;(\d+.\d+.\d+.\d+)\&quot;\)"
+                ReplacementText="AssemblyVersion(&quot;$(_jenkBuildVersion)&quot;)" />
+    <FileUpdate Files="@(AssemblyInfoFiles)"
+                Regex="AssemblyFileVersion\(\&quot;(\d+.\d+.\d+.\d+)\&quot;\)"
+                ReplacementText="AssemblyFileVersion(&quot;$(_jenkBuildVersion)&quot;)" />
+  </Target>
+
+  <ItemGroup>
+    <ProjectToBuild Include="$(_jenkWorkSpace)\SourceCode\BuildApp.sln">
+      <Properties>OutputPath=$(OutputDir);Configuration=Release;Platform=Any CPU;RunCodeAnalysis=true</Properties>
+    </ProjectToBuild>
+  </ItemGroup>
+
+  <Target Name="_solutionToBuild">
+    <Message Text="Building Solutions of $(_jenkAppBranch) branch..." />
+    <MSBuild Projects="@(ProjectToBuild)"/>
+  </Target>
+
+  <Target Name="_generateConfigsApi">
+    <!--Cleanning up existing files from Build Output folder-->
+    <RemoveDir Directories="$(BuildPackageDir)" ContinueOnError="true" />
+    <MakeDir Directories="$(BuildPackageDir)" />
+    <RemoveDir Directories="$(BuildPackageDir)\NuGetPackage" ContinueOnError="true" />
+    <MakeDir Directories="$(BuildPackageDir)\NuGetPackage" />
+
+    <!--Generate new webconfigs for all environemnts
+     Deleting the dummy Fev configuration.xml -->
+    <!--<Delete Files="$(_jenkWorkSpace)\WebConfigurator\DevEnv\configuration.xml" />-->
+     <!--Deleting the dummy Test configuration.xml--><!-- 
+    <Delete Files="$(_jenkWorkSpace)\WebConfigurator\TestEnv\AllstateAlltechOrg\configuration.xml" />
+     --><!--Deleting the dummy  Prod configuration.xml--><!-- 
+    <Delete Files="$(_jenkWorkSpace)\WebConfigurator\ProdEnv\AllstateAlltechOrg\configuration.xml" />-->
+
+     <!--Copy live test and production configuration.xml into test and prod webconfigurator folder--> 
+    <!--<Move SourceFiles="$(_jenkWorkSpace)\ORION\DevEnv\configuration.xml" DestinationFolder ="$(_jenkWorkSpace)\WebConfigurator\DevEnv\"  ContinueOnError="true"/>-->
+    
+    <!--<Move SourceFiles="$(_jenkWorkSpace)\ORION\TestEnv\configuration.xml" DestinationFolder ="$(_jenkWorkSpace)\WebConfigurator\TestEnv\AllstateAlltechOrg\"  ContinueOnError="true"/>
+    <Move SourceFiles="$(_jenkWorkSpace)\ProdEnv\configuration.xml" DestinationFolder ="$(_jenkWorkSpace)\WebConfigurator\ProdEnv\AllstateAlltechOrg\"  ContinueOnError="true"/>-->
+
+    <Exec Command="$(_jenkWorkSpace)\WebConfigurator\DevEnv\GenerateAllWebConfigs.bat"      WorkingDirectory="$(_jenkWorkSpace)\WebConfigurator\DevEnv\"/>
+    <!--<Exec Command="$(_jenkWorkSpace)\WebConfigurator\TestEnv\AllstateAlltechOrg\GenerateAllWebConfigs.bat"      WorkingDirectory="$(_jenkWorkSpace)\WebConfigurator\TestEnv\AllstateAlltechOrg\"/>
+    <Exec Command="$(_jenkWorkSpace)\WebConfigurator\ProdEnv\AllstateAlltechOrg\GenerateAllWebConfigs.bat"      WorkingDirectory="$(_jenkWorkSpace)\WebConfigurator\ProdEnv\AllstateAlltechOrg\"/>-->
+
+    <RemoveDir Directories="$(_jenkWorkSpace)\BuildApp" ContinueOnError="true" />
+    <RemoveDir Directories="$(_jenkWorkSpace)\DevEnv" ContinueOnError="true" />
+    <!--<RemoveDir Directories="$(_jenkWorkSpace)\TestEnv" ContinueOnError="true" />
+    <RemoveDir Directories="$(_jenkWorkSpace)\DREnv" ContinueOnError="true" />
+    <RemoveDir Directories="$(_jenkWorkSpace)\ProdEnv" ContinueOnError="true" />-->
+      
+    <ItemGroup>
+      <CockpitDevEnvBuildAppConfigs Include="$(_jenkWorkSpace)\WebConfigurator\DevEnv\BuildApp\BuildApp*.config"
+                              Exclude="$(_jenkWorkSpace)\WebConfigurator\DevEnv\BuildApp\template*" />
+
+      <!--<CockpitTestEnvOrionConfigs Include="$(_jenkWorkSpace)\WebConfigurator\TestEnv\AllstateAlltechOrg\Orion\Orion*.config"
+                              Exclude="$(_jenkWorkSpace)\WebConfigurator\TestEnv\AllstateAlltechOrg\Orion\template*" />
+      
+      <CockpitProdEnvOrionConfigs Include="$(_jenkWorkSpace)\WebConfigurator\ProdEnv\AllstateAlltechOrg\Orion\Orion*.config"
+                              Exclude="$(_jenkWorkSpace)\WebConfigurator\ProdEnv\AllstateAlltechOrg\Orion\template*" />-->
+
+    </ItemGroup>
+
+    <Copy SourceFiles="@(CockpitDevEnvBuildAppConfigs)" DestinationFolder ="$(BuildPackageDir)\BuildApp\DevConfigs\" />
+    <Copy SourceFiles="$(BuildPackageDir)\BuildApp\DevConfigs\BuildAppDev_web.config"           DestinationFiles ="$(BuildPackageDir)\BuildApp\DevConfigs\web.config" />
+    <Copy SourceFiles="$(BuildPackageDir)\BuildApp\DevConfigs\BuildAppDev_web.config"           DestinationFiles ="$(BuildPackageDir)\BuildApp\DevConfigs\web.config" />
+    <!--<Exec Command="&quot;C:\Windows\Microsoft.NET\Framework64\v4.0.30319\aspnet_regiis.exe&quot; -pef &quot;Allstate.Framework&quot; &quot;$(BuildPackageDir)\Orion\TestConfigs&quot; -prov &quot;AlltechProtectedConfigurationProvider&quot;"/>-->
+    <Delete Files="$(BuildPackageDir)\BuildApp\DevConfigs\web.config" />
+    
+    <!--<Copy SourceFiles="@(CockpitTestEnvOrionConfigs)" DestinationFolder ="$(BuildPackageDir)\Orion\TestConfigs\" />
+    <Copy SourceFiles="$(BuildPackageDir)\Orion\TestConfigs\OrionTest_web.config"           DestinationFiles ="$(BuildPackageDir)\Orion\TestConfigs\web.config" />
+    <Exec Command="&quot;C:\Windows\Microsoft.NET\Framework64\v4.0.30319\aspnet_regiis.exe&quot; -pef &quot;Allstate.Framework&quot; &quot;$(BuildPackageDir)\Orion\TestConfigs&quot; -prov &quot;AlltechProtectedConfigurationProvider&quot;"/>
+    <Copy SourceFiles="$(BuildPackageDir)\Orion\TestConfigs\web.config"           DestinationFiles ="$(BuildPackageDir)\Orion\TestConfigs\OrionTest_web.config" />
+    <Delete Files="$(BuildPackageDir)\Orion\TestConfigs\web.config" />-->
+
+    <!--<Copy SourceFiles="@(CockpitProdEnvOrionConfigs)" DestinationFolder ="$(BuildPackageDir)\Orion\ProdConfigs\" />-->
+    
+    <Delete Files="$(_jenkWorkSpace)\WebConfigurator\DevEnv\configuration.xml" ContinueOnError="true" />
+    <RemoveDir Directories="$(_jenkWorkSpace)\WebConfigurator\DevEnv\BuildApp" ContinueOnError="true" />
+
+    <!--<Delete Files="$(_jenkWorkSpace)\WebConfigurator\TestEnv\AllstateAlltechOrg\configuration.xml" />
+    <RemoveDir Directories="$(_jenkWorkSpace)\WebConfigurator\TestEnv\AllstateAlltechOrg\Orion" ContinueOnError="true" />
+
+    <Delete Files="$(_jenkWorkSpace)\WebConfigurator\ProdEnv\AllstateAlltechOrg\configuration.xml" />
+    <RemoveDir Directories="$(_jenkWorkSpace)\WebConfigurator\ProdEnv\AllstateAlltechOrg\Orion" ContinueOnError="true" />-->
+  </Target>
+
+  <Target Name="_packageFiles">
+
+    <ItemGroup>
+      <BuildAppFiles                     Include="$(_publishedWebsites)\**\*.*"
+                                     Exclude="$(_publishedWebsites)\**\*.pdb;             
+                                              $(_publishedWebsites)\BuildApp\web.config"/>
+    </ItemGroup>
+
+     <!--Copying everything our applcications need to run to BuildOutput--> 
+    <Copy SourceFiles="@(BuildAppFiles)" DestinationFolder ="$(BuildPackageDir)\%(RecursiveDir)" />
+
+  </Target>
+
+  <PropertyGroup>
+    <NuGetID>ESSOFACBuildApp_</NuGetID>
+    <NuGetTitle>ESS_OFAC_BuildApp</NuGetTitle>
+    <NuGetauthor>Allstate Insurance Company</NuGetauthor>
+    <NuGetdescription>BuildApp Nuget Package for $(_jenkAppBranch) release</NuGetdescription>
+    <NugetPackageName_1>BuildApp</NugetPackageName_1>
+  </PropertyGroup>
+
+  <Target Name="_CreateNugetApi">
+
+    <Time Format="2018-01-01">
+      <Output TaskParameter="FormattedTime" PropertyName="PackageDate" />
+    </Time>
+
+    <Exec Command="c:\windows\system32\attrib.exe -r $(_jenkWorkSpace)\Build\ESSOFACBuildApp_BuildApp.nuspec"/>
+
+    <XmlUpdate
+          XmlFileName="$(_jenkWorkSpace)\Build\BuildApp.nuspec"
+           XPath="/package/metadata/id"
+           Value="$(NuGetID)$(NugetPackageName_1)">
+    </XmlUpdate>
+    <XmlUpdate
+       XmlFileName="$(_jenkWorkSpace)\Build\BuildApp.nuspec"
+        XPath="/package/metadata/version"
+        Value="$(_jenkBuildVersion)">
+    </XmlUpdate>
+    <XmlUpdate
+       XmlFileName="$(_jenkWorkSpace)\Build\BuildApp.nuspec"
+        XPath="/package/metadata/title"
+        Value="$(NuGetTitle) $(NugetPackageName_1)">
+    </XmlUpdate>
+    <XmlUpdate
+   XmlFileName="$(_jenkWorkSpace)\Build\BuildApp.nuspec"
+    XPath="/package/metadata/tags"
+        Value="$(PackageDate)">
+    </XmlUpdate>
+    <XmlUpdate
+       XmlFileName="$(_jenkWorkSpace)\Build\BuildApp.nuspec"
+        XPath="/package/metadata/authors"
+        Value="$(NuGetauthor)">
+    </XmlUpdate>
+    <XmlUpdate
+       XmlFileName="$(_jenkWorkSpace)\Build\BuildApp.nuspec"
+        XPath="/package/metadata/description"
+        Value="$(NuGetdescription)">
+    </XmlUpdate>
+
+    <Exec Command="c:\nuget\nuget.exe pack $(_jenkWorkSpace)\Build\BuildApp.nuspec -OutputDirectory $(BuildPackageDir)" />
+  </Target>
+</Project>
