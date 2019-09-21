@@ -14,7 +14,7 @@ namespace BuildApp
         [STAThread]
         static void Main()
         {
-           
+           //*Mohan Krishna*//
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new Form1());
